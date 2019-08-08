@@ -46,7 +46,7 @@ def dqn(agent, env, n_episodes=20, max_t=1000, eps_start=1.0, eps_end=0.01, eps_
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)), end="")
         if i_episode % 100 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_window)))
-        if np.mean(scores_window)>=200.0:
+        if np.mean(scores_window)>=14.0:
             print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode-100, np.mean(scores_window)))
             torch.save(agent.qnetwork_local.state_dict(), model_file)
             break

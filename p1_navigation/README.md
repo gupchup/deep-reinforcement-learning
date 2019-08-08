@@ -4,13 +4,13 @@
 
 # Project 1: Navigation
 
-### Introduction
+## Introduction
 
-For this project, you will train an agent to navigate (and collect bananas!) in a large, square world.  
+In this project, we will train an agent to navigate (and collect bananas!) in a large, square world.  
 
 ![Trained Agent][image1]
 
-A reward of +1 is provided for collecting a yellow banana, and a reward of -1 is provided for collecting a blue banana.  Thus, the goal of your agent is to collect as many yellow bananas as possible while avoiding blue bananas.  
+A reward of +1 is provided for collecting a yellow banana, and a reward of -1 is provided for collecting a blue banana.  Thus, the goal of our agent is to collect as many yellow bananas as possible while avoiding blue bananas.  
 
 The state space has 37 dimensions and contains the agent's velocity, along with ray-based perception of objects around agent's forward direction.  Given this information, the agent has to learn how to best select actions.  Four discrete actions are available, corresponding to:
 - **`0`** - move forward.
@@ -18,9 +18,9 @@ The state space has 37 dimensions and contains the agent's velocity, along with 
 - **`2`** - turn left.
 - **`3`** - turn right.
 
-The task is episodic, and in order to solve the environment, your agent must get an average score of +13 over 100 consecutive episodes.
+The task is episodic, and in order to solve the environment, our agent must get an average score of +13 over 100 consecutive episodes.
 
-### Getting Started
+## Getting Started
 
 1. Download the environment from one of the links below.  You need only select the environment that matches your operating system:
     - Linux: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/Banana_Linux.zip)
@@ -34,22 +34,87 @@ The task is episodic, and in order to solve the environment, your agent must get
 
 2. Place the file in the DRLND GitHub repository, in the `p1_navigation/` folder, and unzip (or decompress) the file. 
 
-### Instructions
+## Walk through of the Solution Notebook
 
-Follow the instructions in `Navigation.ipynb` to get started with training your own agent!  
+### Agent and Environment Set-up
+The initial few sections (1..3) in the notebook are intended to ensure that
+the environment is setup correctly. By running these sections, we should be
+able to assert that the Agent can interact with the environment. At this stage,
+we will also confirm that the Agent can take 4 actions and that the environment has a total of
+37 states.
 
-### (Optional) Challenge: Learning from Pixels
+### Solution using [Deep-Q Learning Algorithm](https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf)
+The solution is broken up into the following parts:
 
-After you have successfully completed the project, if you're looking for an additional challenge, you have come to the right place!  In the project, your agent learned from information such as its velocity, along with ray-based perception of objects around its forward direction.  A more challenging task would be to learn directly from pixels!
+* The interaction between the agent and environment.
+* The design of the agent and replay buffer.
+* Instructions to run.
 
-To solve this harder task, you'll need to download a new Unity environment.  This environment is almost identical to the project environment, where the only difference is that the state is an 84 x 84 RGB image, corresponding to the agent's first-person view.  (**Note**: Udacity students should not submit a project with this new environment.)
+**The Agent-Environment Interaction**:
 
-You need only select the environment that matches your operating system:
-- Linux: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/VisualBanana_Linux.zip)
-- Mac OSX: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/VisualBanana.app.zip)
-- Windows (32-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/VisualBanana_Windows_x86.zip)
-- Windows (64-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P1/Banana/VisualBanana_Windows_x86_64.zip)
+The interaction between the agent and environment follows the typical textbook
+recipe. The environment is reset prior to starting of the simulation (sequence
+of episodes). The exploration rate is set to 1.0 at the beginning of the
+simulation. As the simulation progresses, the exploration rate is tapered.
 
-Then, place the file in the `p1_navigation/` folder in the DRLND GitHub repository, and unzip (or decompress) the file.  Next, open `Navigation_Pixels.ipynb` and follow the instructions to learn how to use the Python API to control the agent.
+In pseudo-code, the following recipe is followed for a simulation:
 
-(_For AWS_) If you'd like to train the agent on AWS, you must follow the instructions to [set up X Server](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md), and then download the environment for the **Linux** operating system above.
+```Plain Text
+foreach episode e:
+    foreach step within e:
+        s <- get current state
+        a <- find action based on current state and exploration rate
+        (s_next, r) <- set action a to get next state and reward
+        (s, a, s_next, r) <- create tuple for learning
+        Update the Agent using the tuple created for learning.  
+```
+
+At each episode the exploration rate is decayed (or tapered) by some rate.
+
+**Design of Agent and Replay Buffer**:
+
+The agent is responsible for taking action and learning from the information
+it has been presented so far. It is initialized with the knowledge of the states,
+actions and a model for making decisions given the states and actions.
+The agent also has a memory buffer where it stores the learning tuples.
+
+Whenever an agent is requested to find an action, it uses the exploration rate
+to figure out whether it wants to select an action or random, or use its
+current model to find the best possible action ([explore/exploit
+tradeoff](https://joshkaufman.net/explore-exploit/)). Whenever that action is
+taken the environment responds with a change in state and a reward (or cost)
+associated with the action. This tuple is stored in the memory buffer.
+
+Whenever enough samples are in memory, the agent tries to update its state of
+the world to learn from the samples. It requests for a random set of tuples
+for the process of learning (experience replay). Note that the random set is
+critical in breaking the temporal bias for the agent to learn effectively. In
+the absence of randomizing the tuples, the agent may become too biased by the
+sequence of actions it has already taken or seen in sequence. This prevents
+oscillations and avoids instability.
+
+In order to ensure effective learning, the agent makes use of one model but
+two different set of parameters. The first set (termed *local*) is used for
+making decisions, while the second set (termed *target*) is used in the
+estimation of the Q-values. This is done to increase robustness. This idea is
+detailed in the following [research paper](https://arxiv.org/abs/1509.06461).
+The loss function is defined as the mean square error between the following
+entities:
+* Q-target computed using the *target* parameters (considering immediate
+  reward and discount factor)
+* The q-value for the current state using the *local* parameters. 
+
+The *target* parameters lag the *local* parameters and they are updated in an
+incremental and weighted fashion with some memory of the previous set of
+parameters.
+
+**Instructions to run**
+The architecture and hyperparameters for the model are detailed in [report.pdf](report.pdf).
+In order to reproduce the results, follow the follow steps:
+* Follow the instructions detailed in the [``Dependencies``
+  section](https://github.com/udacity/deep-reinforcement-learning/blob/master/README.md)
+* Create the environment by following the instructions detailed [here](https://github.com/udacity/deep-reinforcement-learning/blob/master/p1_navigation/README.md). Please ensure that the appropriate platform is selected.
+* Activate ``drlnd`` environment and launch ``jupyter notebook Navigation.ipynb`` from the command prompt.
+* Run ``Navigation.ipynb`` to solve the problem.
+
+
